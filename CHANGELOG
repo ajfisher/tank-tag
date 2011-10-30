@@ -1,0 +1,27 @@
+Version 0.4 (30 October, 2011)
+------------------------------
+
+* carved out code from the previous mega-repo I had with arduino code in it.
+* Clean up and documentation
+* Release as a separate package
+
+Pre-standalone version history
+=============================
+
+Version 0.3 (10 August, 2011)
+------------------------------
+
+* Set up for Web Directions South 2011, refactored JS to run more efficiently
+* slowed down throughput to minimise data transfer from phones.
+* Split "rooms" for broadcast to try and stop "echo chambering"
+
+Version 0.2 (20 August, 2011)
+-------------------------------
+
+* After working with multiple users on low grade WiFi (thanks @jdeblank) changed concept from asteroids-style behaviour to "tank-tag" with relevant refactoring of design.
+* Implementation for presentation at Web Directions What do you Know night.
+
+Version 0.1 (14 August, 2011)
+------------------------------
+
+* Initial set up of concept and got the various components talking to each other

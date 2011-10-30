@@ -1,0 +1,349 @@
+{% extends "base.html" %}
+{% block title %}Tank Tag{% endblock %}
+{% block extra_js %}
+{% load socketio_tags %}
+{% socketio %}
+    <script type="text/javascript">
+        Array.prototype.remove = function(from, to) {
+            var rest = this.slice((to || from) + 1 || this.length);
+            this.length = from < 0 ? this.length + from : from;
+            return this.push.apply(this, rest);
+        };        
+
+        var room = "tank-play";
+	    var socket;
+
+        var canv;
+        var context;
+        
+        var fps = 60;
+        var frame_count = 0;
+        var prev_fps_check = 0;
+        var fps_string = "";
+        
+        var user_counter= 0;
+        
+        var max_speed = 5;
+        var full_speed = 3;
+        var half_speed = 1;
+        
+        var maxfrac = 0.05;
+        var maxv = 0;
+        
+        var bullet_vel = 6;
+        var bullet_livetime = 3000;
+        
+        var tag_time = 2000;
+        
+        var drag = 0.985;
+        
+        var players = {};
+        var bullets = [];
+        
+        var width = 0;
+        var height = 0;
+        
+        function bullet() {
+            this.x = 0;
+            this.y = 0;
+            this.player = "";
+            this.vx = 0;
+            this.vy = 0;
+            this.ttl = bullet_livetime / fps;
+        }
+        
+        function player() {
+            this.x = Math.floor(Math.random()*(width*0.8))+ Math.floor(width*0.2); // make this choose random on width
+            this.y = Math.floor(Math.random()*(height*0.8))+ Math.floor(height*0.2); // make this choose random on height
+            this.vx = 0;
+            this.vy = 0;
+            this.v = 0;
+            this.rotation = 0;
+            this.rot_rad = 0;
+            this.username = "";
+            this.id = "";
+            this.score = 0;
+            this.tagged = false;
+            this.tagged_ttl = 0;
+        }
+
+        
+        function update_game() {
+            // this is the main game loop
+			frame_count++;
+			
+            update_bullets();
+            update_players();
+                
+            // update the canvas:
+            canv.width = canv.width;
+            for (var pid in players) {
+                var plyr = players[pid];
+                draw_tank(plyr.rot_rad, plyr.x, plyr.y, plyr.username);
+            }
+            for (var i=0; i< bullets.length; i++) {
+                draw_bullet(bullets[i].x, bullets[i].y);
+            }
+            draw_leaderboard();
+            draw_users();
+        }
+        
+        function update_bullets(){
+            // updates positions of all the bullets
+            for (var i=0; i< bullets.length; i++) {
+                var b = bullets[i];
+                b.x+= b.vx;
+                b.y+= b.vy;
+                
+                if (b.x < 0) {
+                    b.x = width;
+                }
+                if (b.x > width) {
+                    b.x =0;
+                }
+                if (b.y < 0) {
+                    b.y = height;
+                }
+                if (b.y > height) {
+                    b.y = 0;
+                }            
+                if (--b.ttl < 0) {
+                    bullets.remove(i);
+                }
+            }
+        }
+        
+        function update_players() {
+            // updates position of all the players
+            for (var pid in players) {
+                plyr = players[pid];
+				if (! plyr.tagged) {
+		            brake(plyr, drag);
+		  
+		            if (plyr.v > maxv) {
+		                brake(plyr, maxv / plyr.v);
+		            }
+
+			        plyr.vx = Math.sin(plyr.rot_rad)*plyr.v;
+			        plyr.vy = -(Math.cos(plyr.rot_rad)*plyr.v); 
+			        
+		            plyr.x+= plyr.vx;
+		            plyr.y+= plyr.vy;
+		            
+		            if (plyr.x < 0) {
+		                plyr.x = width;
+		            }
+		            if (plyr.x > width) {
+		                plyr.x =0;
+		            }
+		            if (plyr.y < 0) {
+		                plyr.y = height;
+		            }
+		            if (plyr.y > height) {
+		                plyr.y = 0;
+		            }
+		            
+		            // now check for collisions with bullets using simple bounding box check
+		            for (var j = 0; j<bullets.length; j++) {
+		            	if (bullets[j].x > (plyr.x-20) && bullets[j].x < (plyr.x+20) && bullets[j].y > (plyr.y-20) && bullets[j].y < (plyr.y+20)) {
+		            		// a bullet is inside bounding box.
+		            		if (bullets[j].player != plyr.id) {
+		            			// not MY bullet so it's hit me :(
+		            			plyr.tag_ttl = tag_time / fps;
+		            			plyr.tagged = true;
+		            			players[bullets[j].player].score++;
+		            			bullets.remove(j)
+		            		}
+		            	}
+		            }
+	            } else {
+	            	// count down the tag time  and in the mean time don't
+	            	// update the player at all.
+                	plyr.tag_ttl--;
+                	if (plyr.tag_ttl <= 0) {
+                		// tag time expired so reset.
+                		plyr.tag_ttl = 0;
+                		plyr.tagged = false;
+            		}
+        		}
+                	
+            }
+        }
+        
+        
+        function update_tank(ax, ay, pid) {
+            var plyr = players[pid];
+            // work out the rotation.
+            var rotval = -(ay)*5;
+            rotate(plyr, rotval);
+            
+            // ax comes in range [0-10] as it was absoluted before being passed
+            // 9.8 (10ish) represents phone held on it's edge facing up so should be stop.
+            // 0 represents phone held flat so screen facing up so should be full speed.
+            // so we basically need to invert it.
+            accelerate(plyr, (10-ax)/3);          
+
+        }
+
+        function rotate(plyr, angle) {
+            plyr.rotation += angle;
+            if (plyr.rotation < 0){
+                plyr.rotation += 360;
+            } else if (plyr.rotation > 360) {
+                plyr.rotation -= 360;
+            }
+
+            plyr.rot_rad = plyr.rotation * (Math.PI/180);        
+        }
+
+        function accelerate(plyr, thrust) {  
+            plyr.v = thrust;
+        }
+
+        function brake (plyr, thedrag) {
+            plyr.v *= thedrag;
+        }
+
+        function fire (player_id) {
+            // this function fires a bullet;
+            plyr = players[player_id];
+            var b = new bullet();
+            b.vx = Math.sin(plyr.rot_rad)*bullet_vel;
+            b.vy = -(Math.cos(plyr.rot_rad)*bullet_vel);
+            b.player = plyr.id;
+            b.x = plyr.x;
+            b.y = plyr.y;
+            bullets.push(b);
+        }
+
+        function draw_bullet(x, y) {
+            context.save();
+            context.beginPath();
+            context.arc(x,y,2,0,Math.PI*2,true);
+            context.closePath();
+            context.strokeStyle = "#fff9e1";
+            context.stroke();
+            context.fillStyle = "#fff9e1";
+            context.fill();
+        }
+      
+        function draw_tank(rot, x, y, player_name) {
+            context.save();
+            context.translate(x,y);
+            context.fillStyle = "#fff9e1";
+            context.font = "normal 13px sans-serif";
+            context.fillText(player_name, 12, 37);
+            context.rotate(rot);
+            context.strokeStyle = "#fff9e1";
+            context.beginPath();
+            context.moveTo(-10, -14);
+            context.lineTo(10, -14);
+            context.moveTo(-10, 14);
+            context.lineTo(10, 14);
+            context.moveTo(0, -6);
+            context.lineTo(0, -30);
+            context.stroke();
+            context.beginPath();
+            context.arc(0,0,6,0,Math.PI*2,true);
+            context.closePath();
+            context.stroke();
+            context.strokeRect(-20, -20, 10, 40)
+            context.strokeRect(10, -20, 10, 40)
+            context.restore();       
+        }
+        
+        function draw_leaderboard() {
+        
+        	context.save();
+			context.textAlign = "right";
+			context.textBaseline = "top"
+            context.fillStyle = "#fff9e1";
+			context.font = "bold 16px sans-serif";
+            context.fillText("LEADERBOARD", 1180, 20); 
+			context.font = "bold 12px sans-serif";
+			var i = 0;
+			for (var pid in players) {
+				var plyr_str = players[pid].username + ": " + players[pid].score;
+	            context.fillText(plyr_str, 1180, 40+(i*20));
+	            i++;
+			}
+            context.restore();
+        }
+        
+        /**function draw_fps() {
+        	context.save();
+        	context.textAlign = "left";
+        	context.textbaseline = "top";
+            context.fillStyle = "#fff9e1";
+			context.font = "bold 12px sans-serif";
+			context.fillText(fps_string, 20,20);
+			context.restore();
+        }**/
+
+		/**function update_fps () {
+			// does the actual calculations
+			curr_time = new Date().getTime();
+			elapsed = (curr_time - prev_fps_check)/1000;
+			fps = frame_count / elapsed;
+			fps_string = fps + " FPS";
+			
+			prev_fps_check = curr_time;
+			frame_count = 0;
+		}**/
+		
+		function draw_users() {
+			context.save();
+			context.textAlign = "left";
+			context.textbaseline = "top";
+			context.fillStyle = "#fff9e1";
+			context.font = "bold 16px sans-serif";
+			var user_string = "Players: " + user_counter
+			context.fillText(user_string, 20, 20);
+			context.restore();
+		}
+		
+        
+	    $(function() {
+	        socket = new io.Socket();
+	        socket.connect();
+	        socket.on('connect', function() {
+		        socket.subscribe(room);
+	        });
+	        
+            socket.on('message', function(data) {
+            	//console.log("Message " + data.a);
+                switch (data.a) {
+                    case 'ps':
+                        update_tank(data.x, data.y, data.pid);
+                        break;
+                    case 'fire':
+                        fire(data.pid);
+                        break;
+                    case 'joined':
+                        var new_player = new player();
+                        new_player.id = data.id;
+                        new_player.username = data.username;
+                        players[data.id] = new_player;
+                        user_counter++
+                        break;
+                    case 'leave':
+                        delete players[data.id];
+                }
+            });
+            canv = document.getElementById("canv");
+            width = canv.width;
+            height = canv.height;
+            maxv = width * maxfrac;
+            
+            context = canv.getContext("2d");
+            
+            window.setInterval("update_game()", 1000/fps);
+            window.setInterval("draw_fps()", 1000);
+        });  
+    </script>
+{% endblock %}
+
+{% block main %}
+    <canvas width="1200" height="720" id="canv" style="border: 1px solid #444; background-color: #444;"></canvas>
+    <!--<p style="font-size: 10pt; color: #fff9e1">To join the game: http://10.16.0.31/tanks    more details: @ajfisher slideshare.net/andrewjfisher github.com/ajfisher</p>-->
+{% endblock %}

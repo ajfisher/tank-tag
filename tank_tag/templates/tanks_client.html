@@ -1,0 +1,122 @@
+{% extends "base.html" %}
+
+{% block title %}Tank Tag{% endblock %}
+{% block extra_js %}
+{% load socketio_tags %}
+{% socketio %}
+    <script type="text/javascript" src="{{STATIC_URL}}js/device.js"></script>
+    <script type="text/javascript">
+        var room = "tank";
+	    var socket;
+	    var last_sent = (new Date()).getTime();
+	    var last_fired = (new Date()).getTime();
+	    var threshold = 100; // msec between sends
+
+        var canv;
+        var context;
+        
+        var username = "";
+        var pid = "";
+
+		var ax, ay, az = 0;
+        
+        window.addEventListener("unload", leave_game, false);
+
+        
+        function dokey(e){
+        	ax = 0;
+            switch (e.keyCode){
+                case 46:
+                   ay = -5
+                   break;
+               case 44:
+                    ay = 5
+                    break;
+                case 32:
+                    ax = 5;
+                    break;
+                default:
+                	console.log(e.keyCode);
+            		break;
+            }
+            send_data();
+        }
+        
+        function leave_game(e) {
+            // this handler leaves the game entirely.
+            socket.disconnect();        
+        }
+        
+        function update_accel(e) {
+        	// gets the accelerometer values
+        	var a = deviceMotion(e);
+        	ax = Math.abs(a.accelerationIncludingGravity.x);
+        	ay = a.accelerationIncludingGravity.y;
+            if ((new Date()).getTime() - last_sent > threshold) {
+	            send_data();
+            }
+        }
+
+		function fire(e) {
+			// sends a fire message
+            if ((new Date()).getTime() - last_fired > threshold) {
+	            socket.send({room: room, action: 'fire', pid: pid });
+            }
+		}
+       
+        function send_data() {
+        	//sends the current values of the phone to the server.
+        	$("#status").html("Sending");
+        	last_sent = (new Date()).getTime(); // update the time to now.
+			socket.send({room: room, action: 'mv', ax: ax, ay: ay, pid: pid });
+        }
+        
+	    $(function() {
+	        socket = new io.Socket();
+	        socket.connect();
+	        socket.on('connect', function() {
+		        socket.subscribe(room);
+	        });
+	        
+	        socket.on('message', function(data) {
+	            console.log(data.a);
+	            switch (data.a) {
+	                case "joined":
+	                    if (data.username == username) {
+	                        $("#signin").hide();
+	                        $("#phonedata").show();
+	                        $("#pname").html(data.username);
+	                        $("#pid").html(data.id);
+	                        pid = data.id; // store this for later.
+                            window.addEventListener("devicemotion", update_accel, false);
+                        }
+	                    break;
+                    case "join_failed":
+                        alert("joined failed " + data.message);
+                        break;
+	            }
+	        });
+        });
+            
+        function join_user() {
+            username = $("#username").val();
+            if (username == null || username=="") {
+                alert("please enter a username");
+            } else {
+                socket.send({room: room, action:'join', username: username});
+            }
+        }
+    </script>
+{% endblock %}
+
+{% block main %}
+    <div id="phonedata" style="display:none;">
+    	<p><input type="button" onclick="fire()" value="fire" style="width: 100%; height: 180px;"/></p>
+        <p><span id="status">Not sending</span>
+        name: <span id="pname"></span> ID: <span id="pid"></span></p>
+    </div>
+    <form method="post" action="" id="signin" onsubmit="join_user(); return false;">
+        <p>Enter a name: <br/><input type="text" id="username" name="username"/></p>
+        <p><input type="button" id="join" value="Join" onclick="join_user()"/></p>
+    </form>
+{% endblock %}
