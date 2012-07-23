@@ -1,0 +1,10 @@
+Django==1.4
+argparse==1.2.1
+distribute==0.6.24
+django-socketio==0.3.4
+gevent==0.13.7
+gevent-socketio==0.2.1
+gevent-websocket==0.3.6
+greenlet==0.4.0
+sphinx-me==0.1.2
+wsgiref==0.1.2
