@@ -186,14 +186,16 @@
         }
 
         function rotate(plyr, angle) {
-            plyr.rotation += angle;
-            if (plyr.rotation < 0){
-                plyr.rotation += 360;
-            } else if (plyr.rotation > 360) {
-                plyr.rotation -= 360;
-            }
+            if (plyr !== null) {
+                plyr.rotation += angle;
+                if (plyr.rotation < 0){
+                    plyr.rotation += 360;
+                } else if (plyr.rotation > 360) {
+                    plyr.rotation -= 360;
+                }
 
-            plyr.rot_rad = plyr.rotation * (Math.PI/180);        
+                plyr.rot_rad = plyr.rotation * (Math.PI/180);
+            }        
         }
 
         function accelerate(plyr, thrust) {  
@@ -259,18 +261,18 @@
 			context.textBaseline = "top"
             context.fillStyle = "#fff9e1";
 			context.font = "bold 16px sans-serif";
-            context.fillText("LEADERBOARD", 1180, 20); 
+            context.fillText("LEADERBOARD", 920, 20); 
 			context.font = "bold 12px sans-serif";
 			var i = 0;
 			for (var pid in players) {
 				var plyr_str = players[pid].username + ": " + players[pid].score;
-	            context.fillText(plyr_str, 1180, 40+(i*20));
+	            context.fillText(plyr_str, 920, 40+(i*20));
 	            i++;
 			}
             context.restore();
         }
         
-        /**function draw_fps() {
+        function draw_fps() {
         	context.save();
         	context.textAlign = "left";
         	context.textbaseline = "top";
@@ -278,9 +280,9 @@
 			context.font = "bold 12px sans-serif";
 			context.fillText(fps_string, 20,20);
 			context.restore();
-        }**/
+        }
 
-		/**function update_fps () {
+		function update_fps () {
 			// does the actual calculations
 			curr_time = new Date().getTime();
 			elapsed = (curr_time - prev_fps_check)/1000;
@@ -289,7 +291,7 @@
 			
 			prev_fps_check = curr_time;
 			frame_count = 0;
-		}**/
+		}
 		
 		function draw_users() {
 			context.save();
@@ -344,6 +346,6 @@
 {% endblock %}
 
 {% block main %}
-    <canvas width="1200" height="720" id="canv" style="border: 1px solid #444; background-color: #444;"></canvas>
-    <!--<p style="font-size: 10pt; color: #fff9e1">To join the game: http://10.16.0.31/tanks    more details: @ajfisher slideshare.net/andrewjfisher github.com/ajfisher</p>-->
+    <canvas width="1000" height="700" id="canv" style="border: 1px solid #444; background-color: #444;"></canvas>
+    <p style="font-size: 12pt; color: #fff9e1; font-weight: bold;">To join the game: http://ajf.io/sketching12</p>
 {% endblock %}

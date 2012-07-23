@@ -5,6 +5,7 @@
 {% load socketio_tags %}
 {% socketio %}
     <script type="text/javascript" src="{{STATIC_URL}}js/device.js"></script>
+    <script type="text/javascript" src="{{STATIC_URL}}js/touchyfeely.js"></script>
     <script type="text/javascript">
         var room = "tank";
 	    var socket;
@@ -59,6 +60,10 @@
 
 		function fire(e) {
 			// sends a fire message
+			console.log("fire");
+			//if (touchyfeely.touch) {
+			    e.preventDefault();
+		    //}
             if ((new Date()).getTime() - last_fired > threshold) {
 	            socket.send({room: room, action: 'fire', pid: pid });
             }
@@ -96,22 +101,32 @@
                         break;
 	            }
 	        });
+	        
+            if (touchyfeely.touch) {
+                console.log("Bind to touch");
+                $("#fire_button").bind("touchstart", fire);
+            } else {
+                console.log("Bind to click");
+                $("#fire_button").bind("click", fire);
+            }
         });
             
         function join_user() {
+            console.debug("attempting to join");
             username = $("#username").val();
             if (username == null || username=="") {
                 alert("please enter a username");
             } else {
-                socket.send({room: room, action:'join', username: username});
+                socket.send({room: room, action:'join', username: username});   
             }
         }
+        
     </script>
 {% endblock %}
 
 {% block main %}
     <div id="phonedata" style="display:none;">
-    	<p><input type="button" onclick="fire()" value="fire" style="width: 100%; height: 180px;"/></p>
+    	<div id="fire_button" value="fire" style="width: 100%; height: 180px; background: rgba(128,128,128,0.5);">Fire</div>
         <p><span id="status">Not sending</span>
         name: <span id="pname"></span> ID: <span id="pid"></span></p>
     </div>

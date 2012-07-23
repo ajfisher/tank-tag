@@ -7,14 +7,15 @@ from tanks.models import Player
 max_clients = 1
 
 @events.on_message(channel="tank-play")
-def play_message(request, socket, message):
-    message = message[0]
+def play_message(request, socket, context, message):
+    #message = message
+    pass
     
 
 @events.on_message(channel="tank")
-def message(request, socket, message):
+def message(request, socket, context, message):
     socket.channels = ["tank-play"]
-    message = message[0]
+    #message = message[0]
     if message["action"] == "mv":     
         # pick up the values from the socket message
         socket.broadcast_channel({"a": "ps", "x": message["ax"], "y": message["ay"], "pid": message["pid"]},
@@ -43,7 +44,7 @@ def message(request, socket, message):
             socket.broadcast_channel(joined, channel="tank-play")
 
 @events.on_disconnect(channel="tank")
-def finish(request, socket):
+def finish(request, socket, context):
     try:
         player = Player.objects.get(session=socket.session.session_id)
     except Player.DoesNotExist:
